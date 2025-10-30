@@ -190,308 +190,142 @@ console.log(example(5, 10));
     </ion-app>
 
     <script>
-        // Konfigurasi
-        const CONFIG = {
-            WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
+// Konfigurasi
+const CONFIG = {
+    WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
+};
+
+// Main Analysis Function
+async function analyzeCode() {
+    const code = codeInput.textContent.trim();
+    const language = languageSelect.value;
+    const task = taskSelect.value;
+    const githubUrlValue = githubUrl.value.trim();
+
+    console.log('Analysis request:', { code, language, task, githubUrlValue });
+
+    if (!code && !githubUrlValue) {
+        showError('Masukkan kode atau URL GitHub');
+        return;
+    }
+
+    // Show loading
+    const loadingModal = document.createElement('ion-loading');
+    loadingModal.message = 'Menganalisis kode...';
+    document.body.appendChild(loadingModal);
+    await loadingModal.present();
+
+    try {
+        const payload = {
+            task: task
         };
 
-        // DOM Elements
-        const codeInput = document.getElementById('codeInput');
-        const languageSelect = document.getElementById('languageSelect');
-        const taskSelect = document.getElementById('taskSelect');
-        const githubUrl = document.getElementById('githubUrl');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const resultsSection = document.getElementById('resultsSection');
-        const analysisResults = document.getElementById('analysisResults');
-        const resultSubtitle = document.getElementById('resultSubtitle');
-        const loadingModal = document.getElementById('loadingModal');
-        const themeToggle = document.getElementById('themeToggle');
+        // Only add language if not 'auto'
+        if (language !== 'auto') {
+            payload.language = language;
+        }
 
-        // Theme Toggle
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('ion-palette-dark');
+        if (githubUrlValue) {
+            payload.githubUrl = githubUrlValue;
+        } else {
+            payload.code = code;
+        }
+
+        console.log('Sending payload:', payload);
+
+        const response = await fetch(CONFIG.WORKER_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
         });
 
-        // Analyze Button Handler
-        analyzeBtn.addEventListener('click', async () => {
-            await analyzeCode();
-        });
+        console.log('Response status:', response.status);
 
-        // Sample Code Templates
-        const sampleCodes = {
-            javascript: `function calculateSum(numbers) {
-    let total = 0;
-    for (let i = 0; i < numbers.length; i++) {
-        total += numbers[i];
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error:', errorText);
+            throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log('Analysis result:', result);
+        displayResults(result, task);
+
+    } catch (error) {
+        console.error('Error:', error);
+        showError(`Gagal menganalisis kode: ${error.message}`);
+    } finally {
+        await loadingModal.dismiss();
+        document.body.removeChild(loadingModal);
     }
-    return total;
 }
 
-console.log(calculateSum([1, 2, 3, 4, 5]));`,
-            
-            python: `def calculate_sum(numbers):
-    total = 0
-    for num in numbers:
-        total += num
-    return total
-
-print(calculate_sum([1, 2, 3, 4, 5]))`,
-            
-            java: `public class Calculator {
-    public static int calculateSum(int[] numbers) {
-        int total = 0;
-        for (int i = 0; i < numbers.length; i++) {
-            total += numbers[i];
-        }
-        return total;
-    }
+// Display Results dengan error handling
+function displayResults(result, task) {
+    resultsSection.style.display = 'block';
     
-    public static void main(String[] args) {
-        int[] numbers = {1, 2, 3, 4, 5};
-        System.out.println(calculateSum(numbers));
+    const taskNames = {
+        analyze: 'Analisis Kode',
+        fix: 'Perbaikan Kode',
+        optimize: 'Optimasi Kode',
+        refactor: 'Refactoring Kode',
+        explain: 'Penjelasan Kode'
+    };
+
+    resultSubtitle.textContent = taskNames[task] || 'Analisis Kode';
+
+    let html = '';
+
+    // Handle errors
+    if (result.error) {
+        html = `
+            <div class="analysis-item" style="border-left-color: var(--ion-color-danger);">
+                <h3>Error</h3>
+                <p>${result.error}</p>
+                ${result.details ? `<p><small>Details: ${result.details}</small></p>` : ''}
+            </div>
+        `;
+    } 
+    // Handle raw response
+    else if (result.raw_response) {
+        html = `
+            <div class="analysis-item">
+                <h3>Raw Response</h3>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">${escapeHtml(result.raw_response)}</pre>
+                ${result.parse_error ? `<p class="ion-color-danger">Parse Error: ${result.parse_error}</p>` : ''}
+            </div>
+        `;
     }
-}`
-        };
-
-        // Language change handler
-        languageSelect.addEventListener('ionChange', (event) => {
-            const lang = event.detail.value;
-            if (lang !== 'auto' && sampleCodes[lang]) {
-                codeInput.textContent = sampleCodes[lang];
-            }
-        });
-
-        // Main Analysis Function
-        async function analyzeCode() {
-            const code = codeInput.textContent.trim();
-            const language = languageSelect.value;
-            const task = taskSelect.value;
-            const githubUrlValue = githubUrl.value.trim();
-
-            if (!code && !githubUrlValue) {
-                showError('Masukkan kode atau URL GitHub');
-                return;
-            }
-
-            // Show loading
-            loadingModal.present();
-
-            try {
-                const payload = {
-                    task: task,
-                    language: language === 'auto' ? null : language
-                };
-
-                if (githubUrlValue) {
-                    payload.githubUrl = githubUrlValue;
-                } else {
-                    payload.code = code;
-                }
-
-                const response = await fetch(CONFIG.WORKER_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                displayResults(result, task);
-
-            } catch (error) {
-                console.error('Error:', error);
-                showError(`Gagal menganalisis kode: ${error.message}`);
-            } finally {
-                loadingModal.dismiss();
-            }
+    // Handle successful responses
+    else {
+        switch (task) {
+            case 'analyze':
+                html = renderAnalysis(result);
+                break;
+            case 'fix':
+                html = renderFix(result);
+                break;
+            case 'optimize':
+                html = renderOptimization(result);
+                break;
+            case 'refactor':
+                html = renderRefactor(result);
+                break;
+            case 'explain':
+                html = renderExplanation(result);
+                break;
+            default:
+                html = renderDefault(result);
         }
+    }
 
-        // Display Results
-        function displayResults(result, task) {
-            resultsSection.style.display = 'block';
-            
-            const taskNames = {
-                analyze: 'Analisis Kode',
-                fix: 'Perbaikan Kode',
-                optimize: 'Optimasi Kode',
-                refactor: 'Refactoring Kode',
-                explain: 'Penjelasan Kode'
-            };
-
-            resultSubtitle.textContent = taskNames[task] || 'Analisis Kode';
-
-            let html = '';
-
-            switch (task) {
-                case 'analyze':
-                    html = renderAnalysis(result);
-                    break;
-                case 'fix':
-                    html = renderFix(result);
-                    break;
-                case 'optimize':
-                    html = renderOptimization(result);
-                    break;
-                case 'refactor':
-                    html = renderRefactor(result);
-                    break;
-                case 'explain':
-                    html = renderExplanation(result);
-                    break;
-                default:
-                    html = renderDefault(result);
-            }
-
-            analysisResults.innerHTML = html;
-            
-            // Scroll to results
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Render Analysis Results
-        function renderAnalysis(data) {
-            if (data.raw_response) {
-                return `<div class="result-card">
-                    <h3>Raw Response:</h3>
-                    <pre>${JSON.stringify(data.raw_response, null, 2)}</pre>
-                </div>`;
-            }
-
-            return `
-                <div class="analysis-item">
-                    <h3>Kualitas Kode</h3>
-                    <p>${data.analysis?.quality || 'Tidak tersedia'}</p>
-                </div>
-                
-                <div class="analysis-item">
-                    <h3>Bug yang Ditemukan</h3>
-                    ${renderList(data.analysis?.bugs || data.errors_found || [])}
-                </div>
-                
-                <div class="analysis-item">
-                    <h3>Masalah Keamanan</h3>
-                    ${renderList(data.analysis?.security || [])}
-                </div>
-                
-                <div class="analysis-item">
-                    <h3>Pertimbangan Performa</h3>
-                    ${renderList(data.analysis?.performance || [])}
-                </div>
-                
-                <div class="analysis-item">
-                    <h3>Best Practices</h3>
-                    ${renderList(data.analysis?.best_practices || [])}
-                </div>
-                
-                ${data.analysis?.rating ? `
-                <div class="analysis-item">
-                    <h3>Rating 
-                        <span class="rating-badge ${getRatingClass(data.analysis.rating)}">
-                            ${data.analysis.rating}/10
-                        </span>
-                    </h3>
-                </div>
-                ` : ''}
-                
-                ${data.suggestions ? `
-                <div class="analysis-item">
-                    <h3>Saran Perbaikan</h3>
-                    ${renderList(data.suggestions)}
-                </div>
-                ` : ''}
-            `;
-        }
-
-        // Render Fix Results
-        function renderFix(data) {
-            return `
-                ${data.errors_found ? `
-                <div class="analysis-item">
-                    <h3>Error yang Ditemukan</h3>
-                    ${renderList(data.errors_found)}
-                </div>
-                ` : ''}
-                
-                ${data.fixed_code ? `
-                <div class="analysis-item">
-                    <h3>Kode yang Diperbaiki</h3>
-                    <pre class="fixed-code">${escapeHtml(data.fixed_code)}</pre>
-                </div>
-                ` : ''}
-                
-                ${data.fix_explanation ? `
-                <div class="analysis-item">
-                    <h3>Penjelasan Perbaikan</h3>
-                    <p>${data.fix_explanation}</p>
-                </div>
-                ` : ''}
-            `;
-        }
-
-        // Render Optimization Results
-        function renderOptimization(data) {
-            return `
-                ${data.optimized_code ? `
-                <div class="analysis-item">
-                    <h3>Kode yang Dioptimasi</h3>
-                    <pre class="fixed-code">${escapeHtml(data.optimized_code)}</pre>
-                </div>
-                ` : ''}
-                
-                ${data.optimizations ? `
-                <div class="analysis-item">
-                    <h3>Optimasi yang Dilakukan</h3>
-                    ${renderList(data.optimizations)}
-                </div>
-                ` : ''}
-            `;
-        }
-
-        // Helper Functions
-        function renderList(items) {
-            if (!items || items.length === 0) {
-                return '<p>Tidak ada item</p>';
-            }
-            
-            if (typeof items === 'string') {
-                return `<p>${items}</p>`;
-            }
-            
-            return `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
-        }
-
-        function getRatingClass(rating) {
-            if (rating >= 8) return 'rating-good';
-            if (rating >= 5) return 'rating-medium';
-            return 'rating-poor';
-        }
-
-        function escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        function showError(message) {
-            const alert = document.createElement('ion-alert');
-            alert.header = 'Error';
-            alert.message = message;
-            alert.buttons = ['OK'];
-            
-            document.body.appendChild(alert);
-            alert.present();
-        }
-
-        // Initialize with sample code
-        codeInput.textContent = sampleCodes.javascript;
+    analysisResults.innerHTML = html;
+    
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
     </script>
 </body>
 </html>
