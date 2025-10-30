@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Analyzer AI</title>
+    
+    <!-- Ionic Core CDN -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core@8/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core@8/dist/ionic/ionic.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core@8/css/ionic.bundle.css" />
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --ion-color-primary: #3880ff;
+            --ion-color-success: #2dd36f;
+            --ion-color-warning: #ffc409;
+            --ion-color-danger: #eb445a;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        
+        .code-editor {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            min-height: 200px;
+            padding: 12px;
+        }
+        
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        .analysis-item {
+            margin-bottom: 12px;
+            padding: 12px;
+            border-left: 4px solid var(--ion-color-primary);
+            background: white;
+        }
+        
+        .fixed-code {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .rating-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .rating-good { background: var(--ion-color-success); color: white; }
+        .rating-medium { background: var(--ion-color-warning); color: black; }
+        .rating-poor { background: var(--ion-color-danger); color: white; }
+    </style>
+</head>
+<body>
+    <ion-app>
+        <ion-header>
+            <ion-toolbar color="primary">
+                <ion-title>AI Code Analyzer</ion-title>
+                <ion-buttons slot="end">
+                    <ion-button id="themeToggle">
+                        <ion-icon slot="icon-only" name="contrast"></ion-icon>
+                    </ion-button>
+                </ion-buttons>
+            </ion-toolbar>
+        </ion-header>
+
+        <ion-content class="ion-padding">
+            <div class="container">
+                <!-- Input Section -->
+                <ion-card>
+                    <ion-card-header>
+                        <ion-card-title>Analisis Kode AI</ion-card-title>
+                        <ion-card-subtitle>Analisis, perbaiki, dan optimasi kode dengan AI</ion-card-subtitle>
+                    </ion-card-header>
+                    
+                    <ion-card-content>
+                        <ion-grid>
+                            <ion-row>
+                                <ion-col size="12" size-md="6">
+                                    <ion-item>
+                                        <ion-label position="stacked">Bahasa Pemrograman</ion-label>
+                                        <ion-select value="javascript" id="languageSelect">
+                                            <ion-select-option value="javascript">JavaScript</ion-select-option>
+                                            <ion-select-option value="python">Python</ion-select-option>
+                                            <ion-select-option value="java">Java</ion-select-option>
+                                            <ion-select-option value="cpp">C++</ion-select-option>
+                                            <ion-select-option value="c">C</ion-select-option>
+                                            <ion-select-option value="auto">Auto-detect</ion-select-option>
+                                        </ion-select>
+                                    </ion-item>
+                                </ion-col>
+                                
+                                <ion-col size="12" size-md="6">
+                                    <ion-item>
+                                        <ion-label position="stacked">Tugas Analisis</ion-label>
+                                        <ion-select value="analyze" id="taskSelect">
+                                            <ion-select-option value="analyze">Analisis Kode</ion-select-option>
+                                            <ion-select-option value="fix">Perbaiki Error</ion-select-option>
+                                            <ion-select-option value="optimize">Optimasi</ion-select-option>
+                                            <ion-select-option value="refactor">Refactor</ion-select-option>
+                                            <ion-select-option value="explain">Jelaskan Kode</ion-select-option>
+                                        </ion-select>
+                                    </ion-item>
+                                </ion-col>
+                            </ion-row>
+                            
+                            <ion-row>
+                                <ion-col size="12">
+                                    <ion-item>
+                                        <ion-label position="stacked">URL GitHub (Opsional)</ion-label>
+                                        <ion-input type="url" id="githubUrl" placeholder="https://github.com/user/repo/blob/main/file.js"></ion-input>
+                                    </ion-item>
+                                </ion-col>
+                            </ion-row>
+                            
+                            <ion-row>
+                                <ion-col size="12">
+                                    <ion-item>
+                                        <ion-label position="stacked">Kode Sumber</ion-label>
+                                    </ion-item>
+                                    <div class="code-editor" contenteditable="true" id="codeInput">
+// Masukkan kode Anda di sini
+function example(a, b) {
+    return a + b;
+}
+
+console.log(example(5, 10));
+                                    </div>
+                                </ion-col>
+                            </ion-row>
+                            
+                            <ion-row>
+                                <ion-col size="12">
+                                    <ion-button expand="block" color="primary" id="analyzeBtn">
+                                        <ion-icon slot="start" name="analytics"></ion-icon>
+                                        Analisis Kode
+                                    </ion-button>
+                                </ion-col>
+                            </ion-row>
+                        </ion-grid>
+                    </ion-card-content>
+                </ion-card>
+
+                <!-- Results Section -->
+                <div id="resultsSection" style="display: none;">
+                    <ion-card>
+                        <ion-card-header>
+                            <ion-card-title>Hasil Analisis</ion-card-title>
+                            <ion-card-subtitle id="resultSubtitle"></ion-card-subtitle>
+                        </ion-card-header>
+                        
+                        <ion-card-content>
+                            <div id="analysisResults"></div>
+                        </ion-card-content>
+                    </ion-card>
+                </div>
+
+                <!-- Loading Spinner -->
+                <ion-modal id="loadingModal" trigger="analyzeBtn">
+                    <ion-content class="ion-padding">
+                        <div style="text-align: center; padding: 40px;">
+                            <ion-spinner style="width: 60px; height: 60px;"></ion-spinner>
+                            <ion-text>
+                                <h3>Menganalisis Kode...</h3>
+                                <p>Sedang memproses permintaan Anda</p>
+                            </ion-text>
+                        </div>
+                    </ion-content>
+                </ion-modal>
+            </div>
+        </ion-content>
+    </ion-app>
+
+    <script>
+        // Konfigurasi
+        const CONFIG = {
+            WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
+        };
+
+        // DOM Elements
+        const codeInput = document.getElementById('codeInput');
+        const languageSelect = document.getElementById('languageSelect');
+        const taskSelect = document.getElementById('taskSelect');
+        const githubUrl = document.getElementById('githubUrl');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const analysisResults = document.getElementById('analysisResults');
+        const resultSubtitle = document.getElementById('resultSubtitle');
+        const loadingModal = document.getElementById('loadingModal');
+        const themeToggle = document.getElementById('themeToggle');
+
+        // Theme Toggle
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('ion-palette-dark');
+        });
+
+        // Analyze Button Handler
+        analyzeBtn.addEventListener('click', async () => {
+            await analyzeCode();
+        });
+
+        // Sample Code Templates
+        const sampleCodes = {
+            javascript: `function calculateSum(numbers) {
+    let total = 0;
+    for (let i = 0; i < numbers.length; i++) {
+        total += numbers[i];
+    }
+    return total;
+}
+
+console.log(calculateSum([1, 2, 3, 4, 5]));`,
+            
+            python: `def calculate_sum(numbers):
+    total = 0
+    for num in numbers:
+        total += num
+    return total
+
+print(calculate_sum([1, 2, 3, 4, 5]))`,
+            
+            java: `public class Calculator {
+    public static int calculateSum(int[] numbers) {
+        int total = 0;
+        for (int i = 0; i < numbers.length; i++) {
+            total += numbers[i];
+        }
+        return total;
+    }
+    
+    public static void main(String[] args) {
+        int[] numbers = {1, 2, 3, 4, 5};
+        System.out.println(calculateSum(numbers));
+    }
+}`
+        };
+
+        // Language change handler
+        languageSelect.addEventListener('ionChange', (event) => {
+            const lang = event.detail.value;
+            if (lang !== 'auto' && sampleCodes[lang]) {
+                codeInput.textContent = sampleCodes[lang];
+            }
+        });
+
+        // Main Analysis Function
+        async function analyzeCode() {
+            const code = codeInput.textContent.trim();
+            const language = languageSelect.value;
+            const task = taskSelect.value;
+            const githubUrlValue = githubUrl.value.trim();
+
+            if (!code && !githubUrlValue) {
+                showError('Masukkan kode atau URL GitHub');
+                return;
+            }
+
+            // Show loading
+            loadingModal.present();
+
+            try {
+                const payload = {
+                    task: task,
+                    language: language === 'auto' ? null : language
+                };
+
+                if (githubUrlValue) {
+                    payload.githubUrl = githubUrlValue;
+                } else {
+                    payload.code = code;
+                }
+
+                const response = await fetch(CONFIG.WORKER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayResults(result, task);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(`Gagal menganalisis kode: ${error.message}`);
+            } finally {
+                loadingModal.dismiss();
+            }
+        }
+
+        // Display Results
+        function displayResults(result, task) {
+            resultsSection.style.display = 'block';
+            
+            const taskNames = {
+                analyze: 'Analisis Kode',
+                fix: 'Perbaikan Kode',
+                optimize: 'Optimasi Kode',
+                refactor: 'Refactoring Kode',
+                explain: 'Penjelasan Kode'
+            };
+
+            resultSubtitle.textContent = taskNames[task] || 'Analisis Kode';
+
+            let html = '';
+
+            switch (task) {
+                case 'analyze':
+                    html = renderAnalysis(result);
+                    break;
+                case 'fix':
+                    html = renderFix(result);
+                    break;
+                case 'optimize':
+                    html = renderOptimization(result);
+                    break;
+                case 'refactor':
+                    html = renderRefactor(result);
+                    break;
+                case 'explain':
+                    html = renderExplanation(result);
+                    break;
+                default:
+                    html = renderDefault(result);
+            }
+
+            analysisResults.innerHTML = html;
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Render Analysis Results
+        function renderAnalysis(data) {
+            if (data.raw_response) {
+                return `<div class="result-card">
+                    <h3>Raw Response:</h3>
+                    <pre>${JSON.stringify(data.raw_response, null, 2)}</pre>
+                </div>`;
+            }
+
+            return `
+                <div class="analysis-item">
+                    <h3>Kualitas Kode</h3>
+                    <p>${data.analysis?.quality || 'Tidak tersedia'}</p>
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>Bug yang Ditemukan</h3>
+                    ${renderList(data.analysis?.bugs || data.errors_found || [])}
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>Masalah Keamanan</h3>
+                    ${renderList(data.analysis?.security || [])}
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>Pertimbangan Performa</h3>
+                    ${renderList(data.analysis?.performance || [])}
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>Best Practices</h3>
+                    ${renderList(data.analysis?.best_practices || [])}
+                </div>
+                
+                ${data.analysis?.rating ? `
+                <div class="analysis-item">
+                    <h3>Rating 
+                        <span class="rating-badge ${getRatingClass(data.analysis.rating)}">
+                            ${data.analysis.rating}/10
+                        </span>
+                    </h3>
+                </div>
+                ` : ''}
+                
+                ${data.suggestions ? `
+                <div class="analysis-item">
+                    <h3>Saran Perbaikan</h3>
+                    ${renderList(data.suggestions)}
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // Render Fix Results
+        function renderFix(data) {
+            return `
+                ${data.errors_found ? `
+                <div class="analysis-item">
+                    <h3>Error yang Ditemukan</h3>
+                    ${renderList(data.errors_found)}
+                </div>
+                ` : ''}
+                
+                ${data.fixed_code ? `
+                <div class="analysis-item">
+                    <h3>Kode yang Diperbaiki</h3>
+                    <pre class="fixed-code">${escapeHtml(data.fixed_code)}</pre>
+                </div>
+                ` : ''}
+                
+                ${data.fix_explanation ? `
+                <div class="analysis-item">
+                    <h3>Penjelasan Perbaikan</h3>
+                    <p>${data.fix_explanation}</p>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // Render Optimization Results
+        function renderOptimization(data) {
+            return `
+                ${data.optimized_code ? `
+                <div class="analysis-item">
+                    <h3>Kode yang Dioptimasi</h3>
+                    <pre class="fixed-code">${escapeHtml(data.optimized_code)}</pre>
+                </div>
+                ` : ''}
+                
+                ${data.optimizations ? `
+                <div class="analysis-item">
+                    <h3>Optimasi yang Dilakukan</h3>
+                    ${renderList(data.optimizations)}
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // Helper Functions
+        function renderList(items) {
+            if (!items || items.length === 0) {
+                return '<p>Tidak ada item</p>';
+            }
+            
+            if (typeof items === 'string') {
+                return `<p>${items}</p>`;
+            }
+            
+            return `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
+        }
+
+        function getRatingClass(rating) {
+            if (rating >= 8) return 'rating-good';
+            if (rating >= 5) return 'rating-medium';
+            return 'rating-poor';
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function showError(message) {
+            const alert = document.createElement('ion-alert');
+            alert.header = 'Error';
+            alert.message = message;
+            alert.buttons = ['OK'];
+            
+            document.body.appendChild(alert);
+            alert.present();
+        }
+
+        // Initialize with sample code
+        codeInput.textContent = sampleCodes.javascript;
+    </script>
+</body>
+</html>
