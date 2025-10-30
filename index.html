@@ -195,23 +195,30 @@ const CONFIG = {
     WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
 };
 
-// Main Analysis Function
+// Main Analysis Function dengan GitHub optimizations
 async function analyzeCode() {
     const code = codeInput.textContent.trim();
     const language = languageSelect.value;
     const task = taskSelect.value;
     const githubUrlValue = githubUrl.value.trim();
 
-    console.log('Analysis request:', { code, language, task, githubUrlValue });
+    console.log('Analysis request:', { hasCode: !!code, language, task, githubUrlValue });
 
     if (!code && !githubUrlValue) {
         showError('Masukkan kode atau URL GitHub');
         return;
     }
 
-    // Show loading
+    // Show loading dengan progress indicator untuk GitHub
     const loadingModal = document.createElement('ion-loading');
-    loadingModal.message = 'Menganalisis kode...';
+    
+    if (githubUrlValue) {
+        loadingModal.message = 'Mengambil data dari GitHub...\nIni mungkin membutuhkan waktu beberapa detik';
+        loadingModal.duration = 0; // No auto-dismiss
+    } else {
+        loadingModal.message = 'Menganalisis kode...';
+    }
+    
     document.body.appendChild(loadingModal);
     await loadingModal.present();
 
@@ -220,12 +227,15 @@ async function analyzeCode() {
             task: task
         };
 
-        // Only add language if not 'auto'
         if (language !== 'auto') {
             payload.language = language;
         }
 
         if (githubUrlValue) {
+            // Validate GitHub URL format
+            if (!isValidGitHubUrl(githubUrlValue)) {
+                throw new Error('Format URL GitHub tidak valid. Gunakan format: https://github.com/user/repo/blob/main/file.js');
+            }
             payload.githubUrl = githubUrlValue;
         } else {
             payload.code = code;
@@ -244,37 +254,73 @@ async function analyzeCode() {
         console.log('Response status:', response.status);
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Server error:', errorText);
-            throw new Error(`Server error: ${response.status} - ${errorText}`);
+            let errorMessage = `Server error: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+                if (errorData.details) {
+                    errorMessage += ` - ${errorData.details}`;
+                }
+                if (errorData.suggestion) {
+                    errorMessage += `\n\nSaran: ${errorData.suggestion}`;
+                }
+            } catch (e) {
+                // If response is not JSON, use text
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
         console.log('Analysis result:', result);
-        displayResults(result, task);
+        displayResults(result, task, githubUrlValue);
 
     } catch (error) {
         console.error('Error:', error);
-        showError(`Gagal menganalisis kode: ${error.message}`);
+        
+        // Special handling for GitHub timeouts
+        if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+            showError(`GitHub timeout: ${error.message}\n\nCoba gunakan URL file spesifik (contoh: .../blob/main/file.js) daripada URL repository.`);
+        } else {
+            showError(`Gagal menganalisis: ${error.message}`);
+        }
     } finally {
-        await loadingModal.dismiss();
-        document.body.removeChild(loadingModal);
+        if (loadingModal.isConnected) {
+            await loadingModal.dismiss();
+            document.body.removeChild(loadingModal);
+        }
     }
 }
 
-// Display Results dengan error handling
-function displayResults(result, task) {
+// GitHub URL validation
+function isValidGitHubUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname === 'github.com' && 
+               parsed.pathname.split('/').length >= 3; // minimal: /user/repo
+    } catch {
+        return false;
+    }
+}
+
+// Display Results dengan GitHub context
+function displayResults(result, task, githubUrl) {
     resultsSection.style.display = 'block';
     
     const taskNames = {
         analyze: 'Analisis Kode',
-        fix: 'Perbaikan Kode',
+        fix: 'Perbaikan Kode', 
         optimize: 'Optimasi Kode',
         refactor: 'Refactoring Kode',
         explain: 'Penjelasan Kode'
     };
 
-    resultSubtitle.textContent = taskNames[task] || 'Analisis Kode';
+    let subtitle = taskNames[task] || 'Analisis Kode';
+    if (githubUrl) {
+        subtitle += ` - ${githubUrl}`;
+    }
+    resultSubtitle.textContent = subtitle;
 
     let html = '';
 
