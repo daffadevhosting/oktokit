@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Analyzer AI</title>
     
-    <!-- Ionic Core CDN -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core@8/dist/ionic/ionic.esm.js"></script>
     <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core@8/dist/ionic/ionic.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ionic/core@8/css/ionic.bundle.css" />
     
-    <!-- Custom CSS -->
     <style>
         :root {
             --ion-color-primary: #3880ff;
@@ -31,6 +29,9 @@
             font-family: 'Courier New', monospace;
             min-height: 200px;
             padding: 12px;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+            overflow-x: auto;
         }
         
         .result-card {
@@ -45,6 +46,7 @@
             padding: 12px;
             border-left: 4px solid var(--ion-color-primary);
             background: white;
+            border-radius: 4px;
         }
         
         .fixed-code {
@@ -54,6 +56,7 @@
             border-radius: 8px;
             overflow-x: auto;
             font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
         }
         
         .rating-badge {
@@ -67,6 +70,15 @@
         .rating-good { background: var(--ion-color-success); color: white; }
         .rating-medium { background: var(--ion-color-warning); color: black; }
         .rating-poor { background: var(--ion-color-danger); color: white; }
+        
+        .list-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -74,17 +86,11 @@
         <ion-header>
             <ion-toolbar color="primary">
                 <ion-title>AI Code Analyzer</ion-title>
-                <ion-buttons slot="end">
-                    <ion-button id="themeToggle">
-                        <ion-icon slot="icon-only" name="contrast"></ion-icon>
-                    </ion-button>
-                </ion-buttons>
             </ion-toolbar>
         </ion-header>
 
         <ion-content class="ion-padding">
             <div class="container">
-                <!-- Input Section -->
                 <ion-card>
                     <ion-card-header>
                         <ion-card-title>Analisis Kode AI</ion-card-title>
@@ -136,14 +142,12 @@
                                     <ion-item>
                                         <ion-label position="stacked">Kode Sumber</ion-label>
                                     </ion-item>
-                                    <div class="code-editor" contenteditable="true" id="codeInput">
-// Masukkan kode Anda di sini
+                                    <div class="code-editor" contenteditable="true" id="codeInput">// Masukkan kode Anda di sini
 function example(a, b) {
     return a + b;
 }
 
-console.log(example(5, 10));
-                                    </div>
+console.log(example(5, 10));</div>
                                 </ion-col>
                             </ion-row>
                             
@@ -159,7 +163,6 @@ console.log(example(5, 10));
                     </ion-card-content>
                 </ion-card>
 
-                <!-- Results Section -->
                 <div id="resultsSection" style="display: none;">
                     <ion-card>
                         <ion-card-header>
@@ -172,206 +175,318 @@ console.log(example(5, 10));
                         </ion-card-content>
                     </ion-card>
                 </div>
-
-                <!-- Loading Spinner -->
-                <ion-modal id="loadingModal" trigger="analyzeBtn">
-                    <ion-content class="ion-padding">
-                        <div style="text-align: center; padding: 40px;">
-                            <ion-spinner style="width: 60px; height: 60px;"></ion-spinner>
-                            <ion-text>
-                                <h3>Menganalisis Kode...</h3>
-                                <p>Sedang memproses permintaan Anda</p>
-                            </ion-text>
-                        </div>
-                    </ion-content>
-                </ion-modal>
             </div>
         </ion-content>
     </ion-app>
 
     <script>
-// Konfigurasi
-const CONFIG = {
-    WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
-};
-
-// Main Analysis Function dengan GitHub optimizations
-async function analyzeCode() {
-    const code = codeInput.textContent.trim();
-    const language = languageSelect.value;
-    const task = taskSelect.value;
-    const githubUrlValue = githubUrl.value.trim();
-
-    console.log('Analysis request:', { hasCode: !!code, language, task, githubUrlValue });
-
-    if (!code && !githubUrlValue) {
-        showError('Masukkan kode atau URL GitHub');
-        return;
-    }
-
-    // Show loading dengan progress indicator untuk GitHub
-    const loadingModal = document.createElement('ion-loading');
-    
-    if (githubUrlValue) {
-        loadingModal.message = 'Mengambil data dari GitHub...\nIni mungkin membutuhkan waktu beberapa detik';
-        loadingModal.duration = 0; // No auto-dismiss
-    } else {
-        loadingModal.message = 'Menganalisis kode...';
-    }
-    
-    document.body.appendChild(loadingModal);
-    await loadingModal.present();
-
-    try {
-        const payload = {
-            task: task
+        const CONFIG = {
+            WORKER_URL: 'https://oktokit-ai.androidbutut.workers.dev/analyze'
         };
 
-        if (language !== 'auto') {
-            payload.language = language;
-        }
+        // Get elements
+        const codeInput = document.getElementById('codeInput');
+        const languageSelect = document.getElementById('languageSelect');
+        const taskSelect = document.getElementById('taskSelect');
+        const githubUrl = document.getElementById('githubUrl');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultSubtitle = document.getElementById('resultSubtitle');
+        const analysisResults = document.getElementById('analysisResults');
 
-        if (githubUrlValue) {
-            // Validate GitHub URL format
-            if (!isValidGitHubUrl(githubUrlValue)) {
-                throw new Error('Format URL GitHub tidak valid. Gunakan format: https://github.com/user/repo/blob/main/file.js');
+        // Attach event listener
+        analyzeBtn.addEventListener('click', analyzeCode);
+
+        async function analyzeCode() {
+            const code = codeInput.textContent.trim();
+            const language = languageSelect.value;
+            const task = taskSelect.value;
+            const githubUrlValue = githubUrl.value.trim();
+
+            console.log('Analysis request:', { hasCode: !!code, language, task, githubUrlValue });
+
+            if (!code && !githubUrlValue) {
+                showError('Masukkan kode atau URL GitHub');
+                return;
             }
-            payload.githubUrl = githubUrlValue;
-        } else {
-            payload.code = code;
-        }
 
-        console.log('Sending payload:', payload);
-
-        const response = await fetch(CONFIG.WORKER_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-
-        console.log('Response status:', response.status);
-
-        if (!response.ok) {
-            let errorMessage = `Server error: ${response.status}`;
+            const loading = await createLoading(githubUrlValue);
+            
             try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-                if (errorData.details) {
-                    errorMessage += ` - ${errorData.details}`;
+                const payload = { task };
+
+                if (language !== 'auto') {
+                    payload.language = language;
                 }
-                if (errorData.suggestion) {
-                    errorMessage += `\n\nSaran: ${errorData.suggestion}`;
+
+                if (githubUrlValue) {
+                    if (!isValidGitHubUrl(githubUrlValue)) {
+                        throw new Error('Format URL GitHub tidak valid');
+                    }
+                    payload.githubUrl = githubUrlValue;
+                } else {
+                    payload.code = code;
                 }
-            } catch (e) {
-                // If response is not JSON, use text
-                const errorText = await response.text();
-                errorMessage = errorText || errorMessage;
+
+                console.log('Sending request...');
+
+                const response = await fetch(CONFIG.WORKER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                console.log('Response status:', response.status);
+
+                if (!response.ok) {
+                    let errorMessage = `Server error: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                        if (errorData.details) {
+                            errorMessage += `\n${errorData.details}`;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing error response:', e);
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+                console.log('Result:', result);
+                displayResults(result, task, githubUrlValue);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(`Gagal: ${error.message}`);
+            } finally {
+                loading.dismiss();
             }
-            throw new Error(errorMessage);
         }
 
-        const result = await response.json();
-        console.log('Analysis result:', result);
-        displayResults(result, task, githubUrlValue);
-
-    } catch (error) {
-        console.error('Error:', error);
-        
-        // Special handling for GitHub timeouts
-        if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-            showError(`GitHub timeout: ${error.message}\n\nCoba gunakan URL file spesifik (contoh: .../blob/main/file.js) daripada URL repository.`);
-        } else {
-            showError(`Gagal menganalisis: ${error.message}`);
+        async function createLoading(isGithub) {
+            const loading = document.createElement('ion-loading');
+            loading.message = isGithub ? 
+                'Mengambil dari GitHub...' : 
+                'Menganalisis kode...';
+            loading.duration = 0;
+            document.body.appendChild(loading);
+            await loading.present();
+            return loading;
         }
-    } finally {
-        if (loadingModal.isConnected) {
-            await loadingModal.dismiss();
-            document.body.removeChild(loadingModal);
+
+        function isValidGitHubUrl(url) {
+            try {
+                const parsed = new URL(url);
+                return parsed.hostname === 'github.com' && 
+                       parsed.pathname.split('/').length >= 3;
+            } catch {
+                return false;
+            }
         }
-    }
-}
 
-// GitHub URL validation
-function isValidGitHubUrl(url) {
-    try {
-        const parsed = new URL(url);
-        return parsed.hostname === 'github.com' && 
-               parsed.pathname.split('/').length >= 3; // minimal: /user/repo
-    } catch {
-        return false;
-    }
-}
-
-// Display Results dengan GitHub context
-function displayResults(result, task, githubUrl) {
-    resultsSection.style.display = 'block';
-    
-    const taskNames = {
-        analyze: 'Analisis Kode',
-        fix: 'Perbaikan Kode', 
-        optimize: 'Optimasi Kode',
-        refactor: 'Refactoring Kode',
-        explain: 'Penjelasan Kode'
-    };
-
-    let subtitle = taskNames[task] || 'Analisis Kode';
-    if (githubUrl) {
-        subtitle += ` - ${githubUrl}`;
-    }
-    resultSubtitle.textContent = subtitle;
-
-    let html = '';
-
-    // Handle errors
-    if (result.error) {
-        html = `
-            <div class="analysis-item" style="border-left-color: var(--ion-color-danger);">
-                <h3>Error</h3>
-                <p>${result.error}</p>
-                ${result.details ? `<p><small>Details: ${result.details}</small></p>` : ''}
-            </div>
-        `;
-    } 
-    // Handle raw response
-    else if (result.raw_response) {
-        html = `
-            <div class="analysis-item">
-                <h3>Raw Response</h3>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto;">${escapeHtml(result.raw_response)}</pre>
-                ${result.parse_error ? `<p class="ion-color-danger">Parse Error: ${result.parse_error}</p>` : ''}
-            </div>
-        `;
-    }
-    // Handle successful responses
-    else {
-        switch (task) {
-            case 'analyze':
-                html = renderAnalysis(result);
-                break;
-            case 'fix':
-                html = renderFix(result);
-                break;
-            case 'optimize':
-                html = renderOptimization(result);
-                break;
-            case 'refactor':
-                html = renderRefactor(result);
-                break;
-            case 'explain':
-                html = renderExplanation(result);
-                break;
-            default:
-                html = renderDefault(result);
+        async function showError(message) {
+            const alert = document.createElement('ion-alert');
+            alert.header = 'Error';
+            alert.message = message;
+            alert.buttons = ['OK'];
+            document.body.appendChild(alert);
+            await alert.present();
         }
-    }
 
-    analysisResults.innerHTML = html;
-    
-    // Scroll to results
-    resultsSection.scrollIntoView({ behavior: 'smooth' });
-}
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayResults(result, task, githubUrl) {
+            resultsSection.style.display = 'block';
+            
+            const taskNames = {
+                analyze: 'Analisis Kode',
+                fix: 'Perbaikan Kode', 
+                optimize: 'Optimasi Kode',
+                refactor: 'Refactoring Kode',
+                explain: 'Penjelasan Kode'
+            };
+
+            resultSubtitle.textContent = taskNames[task] || 'Analisis Kode';
+
+            let html = '';
+
+            if (result.error || result.parse_error) {
+                html = `
+                    <div class="analysis-item" style="border-left-color: var(--ion-color-danger);">
+                        <h3>⚠️ Error</h3>
+                        <p>${escapeHtml(result.error || result.parse_error)}</p>
+                        ${result.raw_response ? `<pre style="background:#f5f5f5;padding:12px;overflow-x:auto;">${escapeHtml(result.raw_response)}</pre>` : ''}
+                    </div>
+                `;
+            } else {
+                switch (task) {
+                    case 'analyze':
+                        html = renderAnalysis(result);
+                        break;
+                    case 'fix':
+                        html = renderFix(result);
+                        break;
+                    case 'optimize':
+                        html = renderOptimization(result);
+                        break;
+                    case 'refactor':
+                        html = renderRefactor(result);
+                        break;
+                    case 'explain':
+                        html = renderExplanation(result);
+                        break;
+                    default:
+                        html = renderDefault(result);
+                }
+            }
+
+            analysisResults.innerHTML = html;
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderAnalysis(result) {
+            const analysis = result.analysis || {};
+            const rating = analysis.rating || 0;
+            const ratingClass = rating >= 7 ? 'rating-good' : rating >= 5 ? 'rating-medium' : 'rating-poor';
+            
+            return `
+                <div class="analysis-item">
+                    <h3>📊 Kualitas Kode <span class="rating-badge ${ratingClass}">${rating}/10</span></h3>
+                    <p>${escapeHtml(analysis.quality || 'Tidak ada informasi')}</p>
+                </div>
+                
+                ${renderList('🐛 Bugs Ditemukan', analysis.bugs)}
+                ${renderList('🔒 Keamanan', analysis.security)}
+                ${renderList('⚡ Performa', analysis.performance)}
+                ${renderList('✅ Best Practices', analysis.best_practices)}
+                
+                <div class="analysis-item">
+                    <h3>📝 Ringkasan</h3>
+                    <p>${escapeHtml(result.summary || 'Tidak ada ringkasan')}</p>
+                </div>
+                
+                ${renderList('💡 Saran', result.suggestions)}
+            `;
+        }
+
+        function renderFix(result) {
+            return `
+                ${renderList('🐛 Error Ditemukan', result.errors_found)}
+                
+                <div class="analysis-item">
+                    <h3>🔧 Kode yang Diperbaiki</h3>
+                    <div class="fixed-code">${escapeHtml(result.fixed_code || 'Tidak ada kode')}</div>
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>💬 Penjelasan Perbaikan</h3>
+                    <p>${escapeHtml(result.fix_explanation || 'Tidak ada penjelasan')}</p>
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>🧪 Testing Notes</h3>
+                    <p>${escapeHtml(result.testing_notes || 'Tidak ada catatan testing')}</p>
+                </div>
+            `;
+        }
+
+        function renderOptimization(result) {
+            return `
+                <div class="analysis-item">
+                    <h3>⚡ Kode Teroptimasi</h3>
+                    <div class="fixed-code">${escapeHtml(result.optimized_code || 'Tidak ada kode')}</div>
+                </div>
+                
+                ${renderList('🚀 Optimasi Dilakukan', result.optimizations)}
+                
+                <div class="analysis-item">
+                    <h3>📈 Peningkatan Performa</h3>
+                    <p>${escapeHtml(result.performance_improvement || 'Tidak ada informasi')}</p>
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>⚖️ Tradeoffs</h3>
+                    <p>${escapeHtml(result.tradeoffs || 'Tidak ada tradeoffs')}</p>
+                </div>
+            `;
+        }
+
+        function renderRefactor(result) {
+            return `
+                <div class="analysis-item">
+                    <h3>🔄 Kode Refactored</h3>
+                    <div class="fixed-code">${escapeHtml(result.refactored_code || 'Tidak ada kode')}</div>
+                </div>
+                
+                ${renderList('🔧 Perubahan Refactoring', result.refactoring_changes)}
+                
+                <div class="analysis-item">
+                    <h3>📖 Peningkatan Readability</h3>
+                    <p>${escapeHtml(result.readability_improvement || 'Tidak ada informasi')}</p>
+                </div>
+                
+                <div class="analysis-item">
+                    <h3>🛠️ Maintainability</h3>
+                    <p>${escapeHtml(result.maintainability_notes || 'Tidak ada catatan')}</p>
+                </div>
+            `;
+        }
+
+        function renderExplanation(result) {
+            return `
+                <div class="analysis-item">
+                    <h3>🎯 Tujuan Keseluruhan</h3>
+                    <p>${escapeHtml(result.overall_purpose || 'Tidak ada informasi')}</p>
+                </div>
+                
+                ${renderList('📝 Penjelasan Per Baris', result.line_by_line)}
+                
+                <div class="analysis-item">
+                    <h3>🧮 Algoritma Kunci</h3>
+                    <p>${escapeHtml(result.key_algorithms || 'Tidak ada informasi')}</p>
+                </div>
+                
+                ${renderList('💼 Use Cases', result.use_cases)}
+                
+                <div class="analysis-item">
+                    <h3>⏱️ Analisis Kompleksitas</h3>
+                    <p>${escapeHtml(result.complexity_analysis || 'Tidak ada analisis')}</p>
+                </div>
+            `;
+        }
+
+        function renderList(title, items) {
+            if (!items || !Array.isArray(items) || items.length === 0) {
+                return '';
+            }
+            
+            const listHtml = items.map(item => 
+                `<div class="list-item">${escapeHtml(item)}</div>`
+            ).join('');
+            
+            return `
+                <div class="analysis-item">
+                    <h3>${title}</h3>
+                    ${listHtml}
+                </div>
+            `;
+        }
+
+        function renderDefault(result) {
+            return `
+                <div class="analysis-item">
+                    <h3>📄 Hasil</h3>
+                    <pre style="background:#f5f5f5;padding:12px;overflow-x:auto;">${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
